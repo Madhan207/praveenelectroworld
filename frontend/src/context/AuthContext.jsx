@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
-const API = 'http://localhost:8000/api/auth';
+const API = import.meta.env.DEV ? 'http://localhost:8000/api/auth' : '/api/auth';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);

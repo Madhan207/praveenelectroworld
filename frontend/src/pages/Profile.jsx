@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Package, Truck, Clock, CheckCircle, LogOut, Search } from 'lucide-react';
 
-const API = 'http://localhost:8000/api';
+const API = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
 
 export const Profile = () => {

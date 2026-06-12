@@ -6,7 +6,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { CheckCircle, Package, MapPin, CreditCard } from 'lucide-react';
 
-const API = 'http://localhost:8000/api';
+const API = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
 
 export const Checkout = () => {

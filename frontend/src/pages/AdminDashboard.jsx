@@ -9,7 +9,7 @@ import {
   TrendingUp, AlertTriangle
 } from 'lucide-react';
 
-const API = 'http://localhost:8000/api';
+const API = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
 const multipartHeaders = () => ({
   headers: {
