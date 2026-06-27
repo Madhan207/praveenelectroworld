@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Button } from '../components/Button';
 import { ProductCard } from '../components/ProductCard';
 import { Star, ShieldCheck, Truck, RefreshCw, Headphones } from 'lucide-react';
+
+const API = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 
 // ─── Fake product data always visible for demo ─────────────────────────────
 const CATEGORIES = [
@@ -65,6 +68,21 @@ const TRUST_BADGES = [
 
 export const Home = () => {
   const navigate = useNavigate();
+  const [topSellers, setTopSellers] = useState([]);
+
+  useEffect(() => {
+    // Fetch products from API and take the first 8 as "Top Sellers"
+    const fetchTopSellers = async () => {
+      try {
+        const res = await axios.get(`${API}/products/`);
+        setTopSellers(res.data.slice(0, 8));
+      } catch (error) {
+        console.error('Failed to fetch top sellers:', error);
+        // Fallback or leave empty
+      }
+    };
+    fetchTopSellers();
+  }, []);
 
   return (
     <div className="space-y-24">
@@ -80,7 +98,7 @@ export const Home = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/70 to-transparent" />
         </div>
         <div className="relative z-10 max-w-2xl text-white">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
             <span className="inline-block bg-brand-500/20 border border-brand-400/40 text-brand-300 text-sm font-semibold px-4 py-1.5 rounded-full mb-5">
               🔥 Best Deals of the Season
             </span>
@@ -112,7 +130,8 @@ export const Home = () => {
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
             className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm"
           >
@@ -143,6 +162,7 @@ export const Home = () => {
                   <img
                     src={cat.image}
                     alt={cat.name}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
@@ -168,7 +188,7 @@ export const Home = () => {
           <Button variant="secondary" onClick={() => navigate('/category/smartphones')}>View All</Button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7">
-          {TOP_SELLERS.map(product => (
+          {topSellers.map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

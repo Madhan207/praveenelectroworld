@@ -1,20 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { Button } from '../components/Button';
+import { ProductCard } from '../components/ProductCard';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Minus } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { motion } from 'framer-motion';
+import axios from 'axios';
+
+const API = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 
 export const Cart = () => {
   const { cartItems, updateQuantity, removeFromCart, getCartTotal } = useCart();
   const navigate = useNavigate();
+  const [recommended, setRecommended] = useState([]);
+
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      axios.get(`${API}/products/`)
+        .then(res => setRecommended(res.data.slice(0, 4)))
+        .catch(console.error);
+    }
+  }, [cartItems.length]);
 
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center text-center">
-        <h2 className="text-3xl font-heading font-bold text-slate-900 mb-4">Your Cart is Empty</h2>
-        <p className="text-slate-500 mb-8">Looks like you haven't added anything to your cart yet.</p>
-        <Button onClick={() => navigate('/')}>Start Shopping</Button>
+      <div className="py-10">
+        <div className="min-h-[40vh] flex flex-col items-center justify-center text-center bg-white rounded-3xl p-10 shadow-sm border border-slate-100 mb-12">
+          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+            <ShoppingBag className="w-10 h-10 text-slate-300" />
+          </div>
+          <h2 className="text-3xl font-heading font-bold text-slate-900 mb-4">Your Cart is Empty</h2>
+          <p className="text-slate-500 mb-8 max-w-md mx-auto">Looks like you haven't added anything to your cart yet. Discover our top picks below!</p>
+          <Button onClick={() => navigate('/')}>Start Shopping</Button>
+        </div>
+        
+        {recommended.length > 0 && (
+          <div>
+            <h3 className="text-2xl font-heading font-bold text-slate-900 mb-6">Recommended for you</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {recommended.map(product => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

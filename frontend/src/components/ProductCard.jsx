@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Zap, Star } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
-export const ProductCard = ({ product }) => {
+export const ProductCard = memo(({ product }) => {
   const { addToCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -39,6 +39,7 @@ export const ProductCard = ({ product }) => {
         <img
           src={product.images && product.images.length > 0 ? product.images[0].image : 'https://placehold.co/400x300/f8fafc/94a3b8?text=No+Image'}
           alt={product.name}
+          loading="lazy"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         {/* Badges */}
@@ -106,4 +107,4 @@ export const ProductCard = ({ product }) => {
       </div>
     </motion.div>
   );
-};
+});

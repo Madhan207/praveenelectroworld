@@ -51,7 +51,7 @@ export const Navbar = () => {
           <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 relative text-slate-700 hover:text-brand-600 transition-colors">
             <ShoppingCart className="w-6 h-6" />
             {cartItems.length > 0 && (
-              <span className="absolute top-0 right-0 bg-brand-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                 {cartItems.length}
               </span>
             )}
@@ -72,8 +72,12 @@ export const Navbar = () => {
           </div>
         ) : (
           <Link to="/login">
-            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 text-slate-700 hover:text-brand-600 transition-colors">
-              <User className="w-6 h-6" />
+            <motion.button 
+              whileHover={{ scale: 1.05 }} 
+              whileTap={{ scale: 0.95 }} 
+              className="px-5 py-2 text-sm font-bold bg-brand-600 text-white rounded-full hover:bg-brand-700 transition-colors shadow-md shadow-brand-500/20"
+            >
+              Sign In
             </motion.button>
           </Link>
         )}
