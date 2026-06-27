@@ -9,7 +9,7 @@ import OrderDrawer from '../../components/admin/OrderDrawer';
 import { useToast } from '../../context/ToastContext';
 import { SkeletonTable } from '../../components/admin/SkeletonLoader';
 
-const API = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
 
 const STATUS_COLORS = {

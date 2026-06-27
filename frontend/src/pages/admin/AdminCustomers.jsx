@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Search, Users, ShoppingBag, TrendingUp, Mail } from 'lucide-react';
 import { SkeletonStats } from '../../components/admin/SkeletonLoader';
 
-const API = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
 const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
 
 const AdminCustomers = () => {

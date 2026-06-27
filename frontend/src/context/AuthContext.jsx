@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useCart } from './CartContext';
 
 const AuthContext = createContext();
-const API = import.meta.env.DEV ? 'http://localhost:8000/api/auth' : '/api/auth';
+const API = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL + '/auth' : (import.meta.env.DEV ? 'http://localhost:8000/api/auth' : '/api/auth');
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null);
