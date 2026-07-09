@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api from '../../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Edit2, Trash2, Search, X, ImagePlus, Package,
@@ -9,8 +9,7 @@ import { useToast } from '../../context/ToastContext';
 import { SkeletonTable } from '../../components/admin/SkeletonLoader';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
-const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
-const multiH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}`, 'Content-Type': 'multipart/form-data' } });
+// NOTE: auth headers injected automatically by api.js interceptor
 
 const EMPTY = { name: '', slug: '', category: '', description: '', price: '', discount_price: '', stock: '', is_featured: false, rating: '4.5' };
 
@@ -23,9 +22,11 @@ const StockBadge = ({ stock }) => {
 const AdminProducts = () => {
   const [products, setProducts]     = useState([]);
   const [categories, setCategories] = useState([]);
+  const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState('');
   const [catFilter, setCatFilter]   = useState('all');
+  const [bizFilter, setBizFilter]   = useState('all');
   const [showModal, setModal]       = useState(false);
   const [editItem, setEditItem]     = useState(null);
   const [form, setForm]             = useState(EMPTY);
@@ -37,17 +38,45 @@ const AdminProducts = () => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [p, c] = await Promise.all([axios.get(`${API}/products/`), axios.get(`${API}/categories/`)]);
-      setProducts(p.data); setCategories(c.data);
+      const [p, c, b] = await Promise.all([
+        api.get(`/products/`), 
+        api.get(`/categories/`),
+        api.get(`/businesses/`)
+      ]);
+      setProducts(p.data.results || p.data); 
+      setCategories(c.data.results || c.data);
+      let bizList = b.data.results || b.data;
+      setBusinesses(bizList.filter(bz => bz.type === 'product'));
     } catch { toast('Failed to load products', 'error'); }
     setLoading(false);
   };
   useEffect(() => { fetchAll(); }, []);
 
   const openAdd = () => { setEditItem(null); setForm(EMPTY); setImgFile(null); setFormError(''); setModal(true); };
+
+  // Auto-generate slug from product name (only for new products)
+  const handleNameChange = (value) => {
+    if (!editItem) {
+      const autoSlug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      setForm(prev => ({ ...prev, name: value, slug: autoSlug }));
+    } else {
+      setForm(prev => ({ ...prev, name: value }));
+    }
+  };
+
   const openEdit = (p) => {
     setEditItem(p);
-    setForm({ name: p.name, slug: p.slug, category: p.category, description: p.description, price: p.price, discount_price: p.discount_price || '', stock: p.stock, is_featured: p.is_featured, rating: p.rating });
+    setForm({
+      name: p.name,
+      slug: p.slug,
+      category: String(p.category),   // ensure it's a string to match <select> option values
+      description: p.description,
+      price: p.price,
+      discount_price: p.discount_price || '',
+      stock: p.stock,
+      is_featured: p.is_featured,
+      rating: p.rating,
+    });
     setImgFile(null); setFormError(''); setModal(true);
   };
 
@@ -55,31 +84,54 @@ const AdminProducts = () => {
     e.preventDefault(); setFL(true); setFormError('');
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => { if (k === 'discount_price' && v === '') return; fd.append(k, v); });
+      Object.entries(form).forEach(([k, v]) => {
+        // Skip empty discount_price
+        if (k === 'discount_price' && v === '') return;
+        fd.append(k, v);
+      });
       if (imgFile) fd.append('image', imgFile);
-      if (editItem) await axios.patch(`${API}/products/${editItem.slug}/`, fd, multiH());
-      else await axios.post(`${API}/products/`, fd, multiH());
-      setModal(false); fetchAll();
+
+      if (editItem) {
+        await api.patch(`/products/${editItem.slug}/`, fd);
+      } else {
+        await api.post(`/products/`, fd);
+      }
+      setModal(false);
+      fetchAll();
       toast(editItem ? 'Product updated!' : 'Product added!', 'success');
     } catch (err) {
       const d = err.response?.data;
-      setFormError(d ? JSON.stringify(d) : 'Failed to save product.');
+      if (d && typeof d === 'object') {
+        // Format validation errors into human-readable text
+        const msgs = Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+        setFormError(msgs);
+      } else {
+        setFormError('Failed to save product. Please check all fields and try again.');
+      }
     }
     setFL(false);
   };
 
   const deleteProduct = async (slug, name) => {
     if (!window.confirm(`Delete "${name}"?`)) return;
-    try { await axios.delete(`${API}/products/${slug}/`, authH()); fetchAll(); toast('Product deleted', 'warning'); }
+    try { await api.delete(`/products/${slug}/`); fetchAll(); toast('Product deleted', 'warning'); }
     catch { toast('Delete failed', 'error'); }
   };
 
   const filtered = useMemo(() => {
     let list = products;
     if (search) list = list.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+    
+    // If bizFilter is active, we should filter categories that belong to this business, or filter products by their business
+    // p has p.business_name, but p.business might not be there. Let's filter categories first.
+    if (bizFilter !== 'all') {
+      const allowedCategories = categories.filter(c => String(c.business) === bizFilter).map(c => String(c.id));
+      list = list.filter(p => allowedCategories.includes(String(p.category)));
+    }
+    
     if (catFilter !== 'all') list = list.filter(p => String(p.category) === catFilter);
     return list;
-  }, [products, search, catFilter]);
+  }, [products, search, catFilter, bizFilter, categories]);
 
   if (loading) return <SkeletonTable rows={6} cols={7} />;
 
@@ -109,6 +161,12 @@ const AdminProducts = () => {
             className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border outline-none focus:ring-2 focus:ring-brand-500"
             style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }} />
         </div>
+        <select value={bizFilter} onChange={e => { setBizFilter(e.target.value); setCatFilter('all'); }}
+          className="text-sm px-3 py-2 rounded-xl border outline-none"
+          style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}>
+          <option value="all">All Businesses</option>
+          {businesses.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+        </select>
         <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
           className="text-sm px-3 py-2 rounded-xl border outline-none"
           style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}>
@@ -123,7 +181,7 @@ const AdminProducts = () => {
           <table className="w-full text-sm">
             <thead style={{ background: 'var(--admin-content-bg)' }}>
               <tr>
-                {['Product', 'Category', 'Price', 'Discount', 'Stock', 'Featured', 'Actions'].map(h => (
+                {['Product', 'Business / Category', 'Price', 'Discount', 'Stock', 'Featured', 'Actions'].map(h => (
                   <th key={h} className="px-5 py-3 text-left font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--admin-text-muted)' }}>{h}</th>
                 ))}
               </tr>
@@ -145,7 +203,10 @@ const AdminProducts = () => {
                       <span className="font-semibold max-w-[180px] truncate" style={{ color: 'var(--admin-text)' }}>{p.name}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--admin-text-muted)' }}>{p.category_name}</td>
+                  <td className="px-5 py-3.5 text-sm" style={{ color: 'var(--admin-text-muted)' }}>
+                    <div className="font-semibold" style={{ color: 'var(--admin-text)' }}>{p.business_name}</div>
+                    <div className="text-xs">{p.category_name}</div>
+                  </td>
                   <td className="px-5 py-3.5 font-semibold" style={{ color: 'var(--admin-text)' }}>₹{Number(p.price).toLocaleString('en-IN')}</td>
                   <td className="px-5 py-3.5" style={{ color: 'var(--admin-text-muted)' }}>{p.discount_price ? `₹${Number(p.discount_price).toLocaleString('en-IN')}` : '—'}</td>
                   <td className="px-5 py-3.5"><StockBadge stock={p.stock} /></td>
@@ -174,91 +235,231 @@ const AdminProducts = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* ── Product Modal (centered, full-screen overlay) ── */}
       <AnimatePresence>
         {showModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={e => e.target === e.currentTarget && setModal(false)}>
-            <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
-              className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-3xl shadow-2xl"
-              style={{ background: 'var(--admin-card-bg)' }}>
-              <div className="flex justify-between items-center px-7 pt-7 pb-4 border-b" style={{ borderColor: 'var(--admin-border)' }}>
-                <h2 className="text-xl font-heading font-bold" style={{ color: 'var(--admin-text)' }}>
-                  {editItem ? 'Edit Product' : 'Add New Product'}
-                </h2>
-                <button onClick={() => setModal(false)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors" style={{ color: 'var(--admin-text-muted)' }}>
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-7">
-                {formError && <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 text-sm mb-4">{formError}</div>}
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {[
-                    { label: 'Product Name *', name: 'name', type: 'text' },
-                    { label: 'URL Slug *', name: 'slug', type: 'text' },
-                  ].map(f => (
-                    <div key={f.name}>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--admin-text)' }}>{f.label}</label>
-                      <input type={f.type} required value={form[f.name]} onChange={e => setForm({ ...form, [f.name]: e.target.value })}
-                        className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-brand-500"
-                        style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }} />
+          <motion.div
+            key="modal-bg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4"
+            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setModal(false); }}
+          >
+            <motion.div
+              key="modal-card"
+              initial={{ opacity: 0, y: -30, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 360, damping: 36 }}
+              className="w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+              style={{ background: 'var(--admin-card-bg)' }}
+            >
+              {/* ── Modal Header ── */}
+              <div className="relative overflow-hidden flex-shrink-0">
+                <div className={`absolute inset-0 ${
+                  editItem
+                    ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500'
+                    : 'bg-gradient-to-br from-indigo-600 via-brand-600 to-purple-700'
+                }`} />
+                <div className="absolute inset-0 opacity-10"
+                  style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+                />
+                <div className="relative px-8 py-6 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                      {editItem ? <Edit2 className="w-6 h-6 text-white" /> : <Plus className="w-6 h-6 text-white" />}
                     </div>
-                  ))}
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--admin-text)' }}>Category *</label>
-                    <select required value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-brand-500"
-                      style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}>
-                      <option value="">Select category</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">{editItem ? 'Edit Product' : 'Add New Product'}</h2>
+                      <p className="text-white/70 text-sm mt-0.5">
+                        {editItem ? `Editing: ${editItem.name}` : 'Fill in the details to add a product to your catalog'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--admin-text)' }}>Description *</label>
-                    <textarea rows={3} required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-brand-500"
-                      style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[['Price (₹) *','price',true],['Discount Price (₹)','discount_price',false],['Stock *','stock',true],['Rating (0-5)','rating',false]].map(([lbl,name,req]) => (
-                      <div key={name}>
-                        <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--admin-text)' }}>{lbl}</label>
-                        <input type="number" required={req} min="0" step={name === 'rating' ? '0.1' : '1'} max={name === 'rating' ? '5' : undefined}
-                          value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
-                          className="w-full px-4 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-brand-500"
-                          style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }} />
-                      </div>
-                    ))}
-                  </div>
-                  {/* Image Upload */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--admin-text)' }}>Product Image</label>
-                    <label htmlFor="prod-img" className="flex flex-col items-center gap-2 p-5 border-2 border-dashed rounded-xl cursor-pointer hover:border-brand-400 transition-colors"
-                      style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-content-bg)' }}>
-                      {imgFile ? (
-                        <>
-                          <img src={URL.createObjectURL(imgFile)} alt="Preview" className="w-20 h-20 object-cover rounded-lg" />
-                          <span className="text-xs" style={{ color: 'var(--admin-text-muted)' }}>{imgFile.name}</span>
-                        </>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button" onClick={() => setModal(false)}
+                      className="px-5 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-sm font-semibold transition-all"
+                    >Cancel</button>
+                    <button
+                      form="product-form" type="submit" disabled={formLoading}
+                      className={`px-6 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg ${
+                        editItem
+                          ? 'bg-white/25 hover:bg-white/35 border border-white/30 text-white'
+                          : 'bg-white text-indigo-700 hover:bg-indigo-50 shadow-white/30'
+                      }`}
+                    >
+                      {formLoading ? (
+                        <><span className={`w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin`} /> Saving...</>
+                      ) : editItem ? (
+                        <><CheckCircle className="w-4 h-4" /> Update Product</>
                       ) : (
-                        <>
-                          <ImagePlus className="w-8 h-8" style={{ color: 'var(--admin-text-muted)' }} />
-                          <span className="text-sm font-medium" style={{ color: 'var(--admin-text-muted)' }}>Click to upload image</span>
-                          <span className="text-xs" style={{ color: 'var(--admin-text-muted)' }}>PNG, JPG, WEBP</span>
-                        </>
+                        <><Plus className="w-4 h-4" /> Add Product</>
                       )}
-                      <input type="file" id="prod-img" accept="image/*" className="hidden" onChange={e => setImgFile(e.target.files[0])} />
-                    </label>
+                    </button>
+                    <button
+                      onClick={() => setModal(false)}
+                      className="w-9 h-9 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-all"
+                    ><X className="w-5 h-5" /></button>
                   </div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })} className="w-4 h-4 rounded text-brand-600" />
-                    <span className="text-sm font-medium" style={{ color: 'var(--admin-text)' }}>⭐ Feature on Homepage</span>
-                  </label>
-                  <button type="submit" disabled={formLoading}
-                    className="w-full bg-brand-600 text-white font-bold py-3.5 rounded-xl hover:bg-brand-700 transition-all disabled:opacity-60 text-sm">
-                    {formLoading ? 'Saving...' : (editItem ? '✅ Update Product' : '➕ Add Product')}
-                  </button>
+                </div>
+              </div>
+
+              {/* ── Modal Body ── */}
+              <div className="overflow-y-auto max-h-[75vh]">
+                {formError && (
+                  <div className="mx-8 mt-6 bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-sm flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>{formError}</span>
+                  </div>
+                )}
+
+                <form id="product-form" onSubmit={handleSubmit} className="p-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                    {/* ── LEFT COLUMN: Basic Info ── */}
+                    <div className="space-y-6">
+                      <div className="rounded-2xl border p-6 space-y-5" style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-content-bg)' }}>
+                        <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: 'var(--admin-text-muted)' }}>
+                          <Package className="w-3.5 h-3.5" /> Basic Information
+                        </p>
+
+                        <div>
+                          <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--admin-text)' }}>Product Name *</label>
+                          <input
+                            type="text" required placeholder='e.g. Samsung 55" QLED 4K TV'
+                            value={form.name} onChange={e => handleNameChange(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all focus:ring-2 focus:ring-brand-400"
+                            style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--admin-text)' }}>
+                              URL Slug {!editItem && <span className="text-brand-400 font-normal text-xs">auto</span>}
+                            </label>
+                            <input
+                              type="text" required placeholder="product-url-slug"
+                              value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })}
+                              readOnly={!editItem}
+                              className="w-full px-4 py-3 rounded-xl border text-sm outline-none font-mono"
+                              style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text-muted)', opacity: editItem ? 1 : 0.65 }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--admin-text)' }}>Category *</label>
+                            <select
+                              required value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                              className="w-full px-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                              style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}
+                            >
+                              <option value="">— Select —</option>
+                              {categories.map(c => <option key={c.id} value={c.id}>{c.name}{c.business_name ? ` (${c.business_name})` : ''}</option>)}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--admin-text)' }}>Description *</label>
+                          <textarea
+                            rows={5} required placeholder="Describe the product in detail..."
+                            value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+                            className="w-full px-4 py-3 rounded-xl border text-sm outline-none resize-none focus:ring-2 focus:ring-brand-400"
+                            style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Featured toggle */}
+                      <label
+                        className="flex items-center justify-between p-5 rounded-2xl border cursor-pointer transition-all hover:shadow-md"
+                        style={{
+                          borderColor: form.is_featured ? '#818cf8' : 'var(--admin-border)',
+                          background: form.is_featured ? 'linear-gradient(135deg, #eef2ff, #f5f3ff)' : 'var(--admin-content-bg)'
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl" style={{ background: form.is_featured ? '#e0e7ff' : 'var(--admin-content-bg)' }}>⭐</div>
+                          <div>
+                            <p className="text-sm font-bold" style={{ color: 'var(--admin-text)' }}>Feature on Homepage</p>
+                            <p className="text-xs" style={{ color: 'var(--admin-text-muted)' }}>Show in the featured products carousel</p>
+                          </div>
+                        </div>
+                        <div className={`w-13 h-7 rounded-full relative transition-all ${form.is_featured ? 'bg-indigo-500' : 'bg-slate-200'}`} style={{ width: 52, height: 28 }}>
+                          <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all ${form.is_featured ? 'left-[22px]' : 'left-1'}`} />
+                        </div>
+                        <input type="checkbox" className="hidden" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })} />
+                      </label>
+                    </div>
+
+                    {/* ── RIGHT COLUMN: Pricing & Image ── */}
+                    <div className="space-y-6">
+                      <div className="rounded-2xl border p-6 space-y-5" style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-content-bg)' }}>
+                        <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: 'var(--admin-text-muted)' }}>
+                          <Filter className="w-3.5 h-3.5" /> Pricing & Inventory
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          {[
+                            { label: 'Price (₹) *', name: 'price', req: true, placeholder: '999' },
+                            { label: 'Discount Price (₹)', name: 'discount_price', req: false, placeholder: '799' },
+                            { label: 'Stock Qty *', name: 'stock', req: true, placeholder: '100' },
+                            { label: 'Rating (0-5)', name: 'rating', req: false, placeholder: '4.5' },
+                          ].map(({ label, name, req, placeholder }) => (
+                            <div key={name}>
+                              <label className="block text-sm font-semibold mb-2" style={{ color: 'var(--admin-text)' }}>{label}</label>
+                              <input
+                                type="number" required={req} min="0" placeholder={placeholder}
+                                step={name === 'rating' ? '0.1' : '1'} max={name === 'rating' ? '5' : undefined}
+                                value={form[name]} onChange={e => setForm({ ...form, [name]: e.target.value })}
+                                className="w-full px-4 py-3 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-brand-400"
+                                style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Image Upload */}
+                      <div className="rounded-2xl border p-6 space-y-4" style={{ borderColor: 'var(--admin-border)', background: 'var(--admin-content-bg)' }}>
+                        <p className="text-xs font-bold uppercase tracking-widest flex items-center gap-2" style={{ color: 'var(--admin-text-muted)' }}>
+                          <ImagePlus className="w-3.5 h-3.5" /> Product Image
+                        </p>
+                        <label
+                          htmlFor="prod-img"
+                          className="group flex flex-col items-center justify-center gap-4 p-10 border-2 border-dashed rounded-2xl cursor-pointer transition-all hover:border-brand-400 hover:bg-brand-50/30"
+                          style={{ borderColor: imgFile ? '#818cf8' : 'var(--admin-border)', background: imgFile ? '#eef2ff' : 'var(--admin-card-bg)' }}
+                        >
+                          {imgFile ? (
+                            <>
+                              <img src={URL.createObjectURL(imgFile)} alt="Preview"
+                                className="w-28 h-28 object-cover rounded-2xl shadow-lg ring-4 ring-white" />
+                              <div className="text-center">
+                                <p className="text-sm font-bold text-indigo-700">Image ready!</p>
+                                <p className="text-xs text-indigo-500 mt-0.5 truncate max-w-[200px]">{imgFile.name}</p>
+                                <p className="text-xs text-indigo-400 mt-1">Click to change</p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <ImagePlus className="w-8 h-8 text-slate-400" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-sm font-bold" style={{ color: 'var(--admin-text)' }}>Upload Product Image</p>
+                                <p className="text-xs mt-1" style={{ color: 'var(--admin-text-muted)' }}>Click or drag & drop</p>
+                                <p className="text-xs mt-0.5 opacity-60" style={{ color: 'var(--admin-text-muted)' }}>PNG, JPG, WEBP • Max 5MB</p>
+                              </div>
+                            </>
+                          )}
+                          <input type="file" id="prod-img" accept="image/*" className="hidden" onChange={e => setImgFile(e.target.files[0])} />
+                        </label>
+                      </div>
+                    </div>
+
+                  </div>
                 </form>
               </div>
             </motion.div>
@@ -270,3 +471,4 @@ const AdminProducts = () => {
 };
 
 export default AdminProducts;
+

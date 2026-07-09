@@ -6,14 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package, ShoppingBag, CheckCircle, XCircle, Plus, Trash2, Edit2,
   X, BarChart2, Users, ImagePlus, UserPlus, Eye, EyeOff, LogOut,
-  TrendingUp, AlertTriangle
+  TrendingUp, AlertTriangle, Building2, History
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
-const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token')}` } });
 const multipartHeaders = () => ({
   headers: {
-    Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+    Authorization: `Bearer ${sessionStorage.getItem('access_token')}`,
     'Content-Type': 'multipart/form-data',
   },
 });
@@ -34,7 +34,9 @@ export const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [admins, setAdmins] = useState([]);
+  const [businesses, setBusinesses] = useState([]);
+  const [usersList, setUsersList] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
 
   // Product modal
   const [showProductModal, setShowProductModal] = useState(false);
@@ -65,6 +67,9 @@ export const AdminDashboard = () => {
     fetchProducts();
     fetchOrders();
     fetchCategories();
+    fetchBusinesses();
+    fetchUsers();
+    fetchAuditLogs();
   };
 
   const fetchProducts = async () => {
@@ -75,6 +80,23 @@ export const AdminDashboard = () => {
   };
   const fetchCategories = async () => {
     try { const r = await axios.get(`${API}/categories/`); setCategories(r.data); } catch {}
+  };
+  const fetchBusinesses = async () => {
+    try { const r = await axios.get(`${API}/businesses/`); setBusinesses(r.data); } catch {}
+  };
+  const fetchUsers = async () => {
+    try { const r = await axios.get(`${API}/users/`, authHeaders()); setUsersList(r.data); } catch {}
+  };
+  const fetchAuditLogs = async () => {
+    try { const r = await axios.get(`${API}/auth/audit-logs/`, authHeaders()); setAuditLogs(r.data); } catch {}
+  };
+
+  const updateUserRole = async (userId, newRole) => {
+    try { 
+        await axios.patch(`${API}/auth/users/${userId}/role/`, { role: newRole }, authHeaders()); 
+        fetchUsers();
+        fetchAuditLogs();
+    } catch { alert('Failed to update role'); }
   };
 
   // ── Product CRUD ──────────────────────────────────────────────────────────
@@ -184,9 +206,10 @@ export const AdminDashboard = () => {
 
   const TABS = [
     { id: 'overview', label: 'Overview', icon: BarChart2 },
+    { id: 'businesses', label: 'Businesses', icon: Building2 },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: stats.pending },
-    { id: 'admins', label: 'Admins', icon: Users },
+    { id: 'admins', label: 'Users & Access', icon: Users },
   ];
 
   if (!user?.is_staff) return null;
@@ -278,6 +301,35 @@ export const AdminDashboard = () => {
                   {orders.length === 0 && <tr><td colSpan="5" className="px-5 py-10 text-center text-slate-400">No orders yet</td></tr>}
                 </tbody>
               </table>
+            </div>
+          </>
+        )}
+
+        {/* Businesses */}
+        {activeTab === 'businesses' && (
+          <>
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-heading font-bold text-slate-900">Manage Businesses</h1>
+                <p className="text-slate-500 text-sm">{businesses.length} connected businesses</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+              {businesses.map(b => (
+                <div key={b.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3">
+                  <div className="flex items-center gap-4">
+                    {b.logo ? <img src={b.logo} className="w-12 h-12 rounded-lg object-cover" /> : <div className="w-12 h-12 bg-brand-100 text-brand-600 rounded-lg flex items-center justify-center font-bold text-xl">{b.name[0]}</div>}
+                    <div>
+                      <h3 className="font-bold text-slate-900">{b.name}</h3>
+                      <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{b.type.toUpperCase()}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500 line-clamp-2">{b.description || 'No description provided.'}</p>
+                  <div className="mt-auto pt-3 flex items-center justify-between border-t border-slate-100">
+                     <span className={`text-xs font-bold ${b.is_active ? 'text-green-600' : 'text-red-500'}`}>{b.is_active ? '● Active' : '● Inactive'}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </>
         )}
@@ -411,64 +463,59 @@ export const AdminDashboard = () => {
           </>
         )}
 
-        {/* Create Admin */}
+        {/* Users & Access */}
         {activeTab === 'admins' && (
-          <>
-            <h1 className="text-2xl font-heading font-bold text-slate-900">Create Admin User</h1>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 max-w-xl">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center">
-                  <UserPlus className="w-5 h-5 text-brand-600" />
+          <div className="space-y-8">
+            <div>
+                <h1 className="text-2xl font-heading font-bold text-slate-900 mb-6">User Access Management</h1>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                    <tr>{['Name', 'Email', 'Mobile', 'Current Role', 'Change Role'].map(h => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                    {usersList.map(u => (
+                        <tr key={u.id} className="hover:bg-slate-50">
+                        <td className="px-5 py-3 font-semibold text-slate-900">{u.name}</td>
+                        <td className="px-5 py-3 text-slate-500">{u.email}</td>
+                        <td className="px-5 py-3 text-slate-500">{u.mobile_number}</td>
+                        <td className="px-5 py-3">
+                            <span className="px-2 py-1 bg-brand-50 text-brand-700 rounded-lg text-xs font-bold">{u.role}</span>
+                        </td>
+                        <td className="px-5 py-3">
+                            <select value={u.role} onChange={e => updateUserRole(u.id, e.target.value)} disabled={u.id === user?.id}
+                                className="text-xs font-bold border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 focus:ring-2 focus:ring-brand-400 outline-none cursor-pointer disabled:opacity-50">
+                                <option value="customer">Customer</option>
+                                <option value="employee">Employee</option>
+                                <option value="manager">Store Manager</option>
+                                <option value="superadmin">Super Admin</option>
+                            </select>
+                        </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
                 </div>
-                <div>
-                  <h2 className="font-bold text-slate-900">New Admin Account</h2>
-                  <p className="text-slate-500 text-sm">Create a new admin with full dashboard access</p>
-                </div>
-              </div>
-
-              {adminFormError && <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 mb-4 text-sm">{adminFormError}</div>}
-              {adminSuccess && <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl p-3 mb-4 text-sm font-medium">✅ {adminSuccess}</div>}
-
-              <form onSubmit={handleCreateAdmin} className="space-y-4">
-                {[
-                  { label: 'Full Name', name: 'name', type: 'text', placeholder: 'Admin Full Name' },
-                  { label: 'Email Address', name: 'email', type: 'email', placeholder: 'admin@example.com' },
-                  { label: 'Mobile Number', name: 'mobile_number', type: 'tel', placeholder: '10-digit mobile' },
-                ].map(f => (
-                  <div key={f.name}>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
-                    <input type={f.type} placeholder={f.placeholder} required value={adminForm[f.name]}
-                      onChange={e => setAdminForm({ ...adminForm, [f.name]: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none" />
-                  </div>
-                ))}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-                  <div className="relative">
-                    <input type={showAdminPass ? 'text' : 'password'} required minLength={6}
-                      placeholder="Min. 6 characters" value={adminForm.password}
-                      onChange={e => setAdminForm({ ...adminForm, password: e.target.value })}
-                      className="w-full px-4 py-3 pr-12 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none" />
-                    <button type="button" onClick={() => setShowAdminPass(!showAdminPass)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
-                      {showAdminPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirm Password</label>
-                  <input type="password" required placeholder="Re-enter password" value={adminForm.confirm_password}
-                    onChange={e => setAdminForm({ ...adminForm, confirm_password: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-brand-500 outline-none" />
-                </div>
-                <button type="submit" disabled={adminFormLoading}
-                  className="w-full bg-brand-600 text-white font-bold py-3.5 rounded-xl hover:bg-brand-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60">
-                  <UserPlus className="w-5 h-5" />
-                  {adminFormLoading ? 'Creating...' : 'Create Admin Account'}
-                </button>
-              </form>
             </div>
-          </>
+
+            <div>
+                <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2"><History className="w-5 h-5 text-slate-500" /> Access Audit Logs</h2>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 space-y-3">
+                   {auditLogs.length === 0 ? <p className="text-slate-500 text-sm">No audit logs found.</p> : auditLogs.map(log => (
+                       <div key={log.id} className="flex gap-4 items-start p-3 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-100">
+                           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><CheckCircle className="w-4 h-4"/></div>
+                           <div>
+                               <p className="text-sm text-slate-900">
+                                   <strong>{log.admin_name} ({log.admin_email})</strong> changed role of <strong>{log.target_name} ({log.target_email})</strong>
+                               </p>
+                               <p className="text-xs text-slate-500 mt-1">From <span className="font-bold">{log.previous_role || 'None'}</span> to <span className="font-bold">{log.new_role}</span></p>
+                               <p className="text-[10px] text-slate-400 mt-1">{new Date(log.timestamp).toLocaleString()} · IP: {log.ip_address || 'Unknown'}</p>
+                           </div>
+                       </div>
+                   ))}
+                </div>
+            </div>
+          </div>
         )}
       </main>
 

@@ -77,9 +77,24 @@ const OrderDrawer = ({ order, onClose, onStatusChange }) => {
               <span className="text-sm font-medium" style={{ color: 'var(--admin-text)' }}>{order.payment_method}</span>
               <span className="text-xl font-heading font-bold text-green-600">₹{Number(order.total_amount).toLocaleString('en-IN')}</span>
             </div>
-            {order.payment_verification?.screenshot && (
-              <a href={`http://localhost:8000${order.payment_verification.screenshot}`} target="_blank" rel="noopener noreferrer"
-                className="mt-2 inline-block text-xs text-brand-600 hover:underline">View payment screenshot →</a>
+            {order.payment_verification && (
+              <div className="mt-3 p-3 rounded-xl border bg-slate-50 border-slate-200">
+                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--admin-text)' }}>
+                  Transaction ID (UTR): <span className="font-mono text-brand-600 ml-1">{order.payment_verification.utr_number || 'N/A'}</span>
+                </p>
+                {order.payment_verification.screenshot && (() => {
+                  const s = order.payment_verification.screenshot;
+                  const imgUrl = s.startsWith('http') ? s : `http://localhost:8000${s.startsWith('/') ? '' : '/'}${s}`;
+                  return (
+                    <div className="mt-2">
+                      <p className="text-xs text-slate-500 mb-1">Payment Screenshot:</p>
+                      <a href={imgUrl} target="_blank" rel="noopener noreferrer" className="block max-w-[200px]">
+                        <img src={imgUrl} alt="Payment Proof" className="w-full h-auto rounded-lg border shadow-sm hover:opacity-90 transition-opacity" />
+                      </a>
+                    </div>
+                  );
+                })()}
+              </div>
             )}
           </div>
 

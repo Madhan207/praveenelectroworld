@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Package, Truck, Clock, CheckCircle, Search, Download, RefreshCw, Star, XCircle } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
+import axios from 'axios';
 
-export const OrdersTab = ({ orders }) => {
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token')}` } });
+
+export const OrdersTab = ({ orders: initialOrders }) => {
+  const [orders, setOrders] = useState(initialOrders);
+  const [cancellingId, setCancellingId] = useState(null);
+  const { toast } = useToast();
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'Delivered': return 'text-green-600 bg-green-50 border-green-200';
@@ -22,6 +31,30 @@ export const OrdersTab = ({ orders }) => {
       case 'Cancelled': return <XCircle className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
     }
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm("Are you sure you want to cancel this order?")) return;
+    
+    setCancellingId(orderId);
+    try {
+      const res = await axios.patch(`${API}/orders/${orderId}/cancel/`, {}, authHeaders());
+      
+      // Update local state
+      setOrders(orders.map(o => 
+        o.id === orderId ? { ...o, status: 'Cancelled' } : o
+      ));
+      
+      toast('Order cancelled successfully.', 'success');
+    } catch (err) {
+      toast(err.response?.data?.detail || 'Failed to cancel order.', 'error');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const showToast = (msg, type = 'info') => {
+    toast(msg, type);
   };
 
   if (orders.length === 0) {
@@ -69,7 +102,10 @@ export const OrdersTab = ({ orders }) => {
             <div className="flex flex-col items-end">
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">Order # {order.id}</p>
               <div className="flex gap-3 mt-1">
-                <button className="text-sm font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                <button 
+                  onClick={() => showToast('Invoice downloading...', 'info')}
+                  className="text-sm font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                >
                   <Download className="w-4 h-4" /> Invoice
                 </button>
               </div>
@@ -110,10 +146,16 @@ export const OrdersTab = ({ orders }) => {
                       </div>
                       
                       <div className="flex gap-3 mt-4">
-                        <button className="px-4 py-1.5 bg-brand-50 text-brand-700 text-xs font-bold rounded-lg hover:bg-brand-100 transition-colors flex items-center gap-1.5">
+                        <button 
+                          onClick={() => showToast('Item added to cart.', 'success')}
+                          className="px-4 py-1.5 bg-brand-50 text-brand-700 text-xs font-bold rounded-lg hover:bg-brand-100 transition-colors flex items-center gap-1.5"
+                        >
                           <RefreshCw className="w-3.5 h-3.5" /> Buy Again
                         </button>
-                        <button className="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5">
+                        <button 
+                          onClick={() => showToast('Review system coming soon!', 'info')}
+                          className="px-4 py-1.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+                        >
                           <Star className="w-3.5 h-3.5" /> Write Review
                         </button>
                       </div>
@@ -124,18 +166,34 @@ export const OrdersTab = ({ orders }) => {
               
               {/* Order Actions Sidebar */}
               <div className="w-full lg:w-64 shrink-0 space-y-3 lg:border-l border-slate-100 lg:pl-8">
-                <button className="w-full py-2.5 bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-700 transition-colors shadow-md shadow-brand-500/20">
+                <button 
+                  onClick={() => showToast(`Tracking package for Order #${order.id}...`, 'info')}
+                  className="w-full py-2.5 bg-brand-600 text-white text-sm font-bold rounded-xl hover:bg-brand-700 transition-colors shadow-md shadow-brand-500/20"
+                >
                   Track Package
                 </button>
-                <button className="w-full py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors">
+                <button 
+                  onClick={() => showToast('Return request initiated.', 'success')}
+                  className="w-full py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                >
                   Return or Replace Items
                 </button>
-                <button className="w-full py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors">
+                <button 
+                  onClick={() => showToast('Connecting to support...', 'info')}
+                  className="w-full py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                >
                   Get Product Support
                 </button>
-                <button className="w-full py-2.5 bg-white border border-slate-200 text-red-600 text-sm font-bold rounded-xl hover:bg-red-50 transition-colors">
-                  Cancel Order
-                </button>
+                
+                {['Pending', 'Processing'].includes(order.status) && (
+                  <button 
+                    onClick={() => handleCancelOrder(order.id)}
+                    disabled={cancellingId === order.id}
+                    className={`w-full py-2.5 bg-white border border-slate-200 text-red-600 text-sm font-bold rounded-xl transition-colors ${cancellingId === order.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}
+                  >
+                    {cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}
+                  </button>
+                )}
               </div>
 
             </div>

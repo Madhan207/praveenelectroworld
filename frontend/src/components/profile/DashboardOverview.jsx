@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Package, Heart, ShoppingCart, TrendingUp, Award, User, Edit3, Shield, Calendar, Phone, Mail } from 'lucide-react';
+import { Package, ShoppingCart, TrendingUp, Award, User, Edit3, Shield, Calendar, Phone, Mail } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
 export const DashboardOverview = ({ user, orders }) => {
@@ -11,7 +11,6 @@ export const DashboardOverview = ({ user, orders }) => {
 
   const stats = [
     { label: 'Total Orders', value: orders.length, icon: Package, color: 'from-blue-500 to-indigo-600', bg: 'bg-blue-50', text: 'text-blue-600' },
-    { label: 'Wishlist Items', value: '12', icon: Heart, color: 'from-pink-500 to-rose-600', bg: 'bg-pink-50', text: 'text-pink-600' },
     { label: 'Cart Items', value: cartItems.length, icon: ShoppingCart, color: 'from-brand-500 to-cyan-600', bg: 'bg-brand-50', text: 'text-brand-600' },
     { label: 'Reward Points', value: rewardPoints.toLocaleString(), icon: Award, color: 'from-amber-400 to-orange-500', bg: 'bg-amber-50', text: 'text-amber-600' },
   ];
@@ -19,7 +18,7 @@ export const DashboardOverview = ({ user, orders }) => {
   return (
     <div className="space-y-8">
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((stat, i) => (
           <motion.div
             key={i}

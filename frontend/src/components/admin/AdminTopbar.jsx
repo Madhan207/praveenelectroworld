@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Menu, Search, Bell, Sun, Moon, ChevronRight, ExternalLink } from 'lucide-react';
+import { Menu, Search, Bell, Sun, Moon, ChevronRight, ExternalLink, Briefcase, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
 const BREADCRUMB_MAP = {
   '/admin':           ['Dashboard'],
   '/admin/orders':    ['Dashboard', 'Orders'],
@@ -10,17 +9,28 @@ const BREADCRUMB_MAP = {
   '/admin/customers': ['Dashboard', 'Customers'],
   '/admin/analytics': ['Dashboard', 'Analytics'],
   '/admin/settings':  ['Dashboard', 'Settings'],
+  '/admin/service-management': ['Dashboard', 'Service Management'],
+  '/admin/trust-management': ['Dashboard', 'Trust Management'],
+  '/admin/transport-management': ['Dashboard', 'Transport Management'],
+  '/admin/payments': ['Dashboard', 'Payments'],
+  '/admin/purchase': ['Dashboard', 'Purchase'],
+  '/admin/inventory': ['Dashboard', 'Inventory'],
+  '/admin/reports': ['Dashboard', 'Reports'],
+  '/admin/security': ['Dashboard', 'Security Logs'],
+  '/admin/businesses': ['Dashboard', 'Businesses'],
+  '/admin/bookings': ['Dashboard', 'Bookings'],
 };
 
 const AdminTopbar = ({ sidebarCollapsed, onToggleSidebar, darkMode, onToggleDark }) => {
   const { pathname } = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  
   const crumbs = BREADCRUMB_MAP[pathname] || ['Dashboard'];
 
   return (
     <header
-      className="flex items-center gap-4 px-6 py-3 border-b shrink-0"
+      className="flex items-center gap-4 px-6 py-3 border-b shrink-0 z-40 relative"
       style={{ background: 'var(--admin-topbar-bg)', borderColor: 'var(--admin-border)', minHeight: '64px' }}
     >
       {/* Sidebar toggle */}
@@ -33,7 +43,7 @@ const AdminTopbar = ({ sidebarCollapsed, onToggleSidebar, darkMode, onToggleDark
       </button>
 
       {/* Breadcrumb */}
-      <nav className="hidden sm:flex items-center gap-1.5 text-sm">
+      <nav className="hidden md:flex items-center gap-1.5 text-sm mr-4">
         {crumbs.map((c, i) => (
           <React.Fragment key={c}>
             {i > 0 && <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--admin-text-muted)' }} />}
@@ -47,10 +57,12 @@ const AdminTopbar = ({ sidebarCollapsed, onToggleSidebar, darkMode, onToggleDark
         ))}
       </nav>
 
+
+
       <div className="flex-1" />
 
       {/* Search bar */}
-      <div className="hidden md:flex items-center relative">
+      <div className="hidden lg:flex items-center relative">
         <AnimatePresence>
           {searchOpen && (
             <motion.input
@@ -59,7 +71,7 @@ const AdminTopbar = ({ sidebarCollapsed, onToggleSidebar, darkMode, onToggleDark
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
               autoFocus
-              placeholder="Search orders, products..."
+              placeholder="Search ERP..."
               onBlur={() => setSearchOpen(false)}
               className="text-sm px-4 py-2 rounded-lg border outline-none"
               style={{
@@ -100,13 +112,13 @@ const AdminTopbar = ({ sidebarCollapsed, onToggleSidebar, darkMode, onToggleDark
               style={{ background: 'var(--admin-card-bg)', borderColor: 'var(--admin-border)' }}
             >
               <div className="px-4 py-3 border-b flex justify-between items-center" style={{ borderColor: 'var(--admin-border)' }}>
-                <span className="font-bold text-sm" style={{ color: 'var(--admin-text)' }}>Notifications</span>
+                <span className="font-bold text-sm" style={{ color: 'var(--admin-text)' }}>Alerts</span>
                 <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">3 new</span>
               </div>
               {[
-                { title: 'New order placed', desc: 'Order #1042 — ₹4,299', time: '2m ago', dot: 'bg-green-500' },
-                { title: 'Low stock alert', desc: 'Product "BoAt Headphones" has 3 left', time: '15m ago', dot: 'bg-amber-500' },
-                { title: 'UPI payment pending', desc: 'Order #1039 needs verification', time: '1h ago', dot: 'bg-blue-500' },
+                { title: 'New order placed', desc: 'Order #1042 — ₹4,299 (Electro World)', time: '2m ago', dot: 'bg-green-500' },
+                { title: 'New DJ Booking', desc: 'Wedding DJ Request — Chennai', time: '15m ago', dot: 'bg-purple-500' },
+                { title: 'Logistics Quote', desc: '5-Ton Cargo Quote Request', time: '1h ago', dot: 'bg-yellow-500' },
               ].map((n, i) => (
                 <div key={i} className="px-4 py-3 hover:bg-slate-50 transition-colors flex gap-3 items-start cursor-pointer border-b last:border-0"
                   style={{ borderColor: 'var(--admin-border)' }}>
@@ -141,12 +153,13 @@ const AdminTopbar = ({ sidebarCollapsed, onToggleSidebar, darkMode, onToggleDark
         to="/"
         target="_blank"
         rel="noopener noreferrer"
-        className="hidden md:flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border transition-all hover:border-brand-400 hover:text-brand-600"
-        style={{ borderColor: 'var(--admin-border)', color: 'var(--admin-text-muted)' }}
+        className="hidden sm:flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border transition-all hover:border-brand-400 hover:text-brand-600 shadow-sm"
+        style={{ borderColor: 'var(--admin-border)', color: 'var(--admin-text-muted)', background: 'var(--admin-card-bg)' }}
       >
         <ExternalLink className="w-3.5 h-3.5" />
         View Site
       </Link>
+      
     </header>
   );
 };

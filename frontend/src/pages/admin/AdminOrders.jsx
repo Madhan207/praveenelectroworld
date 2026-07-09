@@ -3,14 +3,15 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Filter, Download, CheckCircle, XCircle, Eye,
-  ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal
+  ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal, Calendar, FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import OrderDrawer from '../../components/admin/OrderDrawer';
 import { useToast } from '../../context/ToastContext';
 import { SkeletonTable } from '../../components/admin/SkeletonLoader';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
-const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+const authH = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token')}` } });
 
 const STATUS_COLORS = {
   'Pending':          'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -29,18 +30,43 @@ const ALL_STATUSES = ['All', 'Pending', 'Payment Verified', 'Processing', 'Shipp
 const ALL_METHODS  = ['All', 'UPI', 'COD'];
 
 const exportCSV = (orders) => {
-  const headers = ['ID', 'Customer', 'Email', 'Phone', 'Amount', 'Method', 'Status', 'Date', 'City', 'State'];
-  const rows = orders.map(o => [
-    o.id, o.user_name || o.full_name, o.user_email, o.mobile_number,
-    o.total_amount, o.payment_method, o.status,
-    new Date(o.created_at).toLocaleDateString('en-IN'),
-    o.city, o.state,
-  ]);
+  const headers = ['ID', 'Customer', 'Email', 'Phone', 'Business', 'Category', 'Amount', 'Method', 'Status', 'Date', 'City', 'State'];
+  const rows = orders.map(o => {
+    const category = o.items && o.items.length > 0 ? o.items[0].product_category_name || 'N/A' : 'N/A';
+    return [
+      o.id, o.user_name || o.full_name, o.user_email, o.mobile_number,
+      o.business_name || 'N/A', category,
+      o.total_amount, o.payment_method, o.status,
+      new Date(o.created_at).toLocaleDateString('en-IN'),
+      o.city, o.state,
+    ];
+  });
   const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a'); a.href = url; a.download = 'orders.csv'; a.click();
   URL.revokeObjectURL(url);
+};
+
+const exportExcel = (orders) => {
+  const data = orders.map(o => ({
+    'Order ID': o.id,
+    'Customer Name': o.user_name || o.full_name,
+    'Email': o.user_email,
+    'Phone': o.mobile_number,
+    'Business': o.business_name || 'N/A',
+    'Category': o.items && o.items.length > 0 ? o.items[0].product_category_name || 'N/A' : 'N/A',
+    'Total Amount': o.total_amount,
+    'Payment Method': o.payment_method,
+    'Status': o.status,
+    'Date': new Date(o.created_at).toLocaleDateString('en-IN'),
+    'City': o.city,
+    'State': o.state,
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Orders");
+  XLSX.writeFile(wb, "orders_export.xlsx");
 };
 
 const AdminOrders = () => {
@@ -49,6 +75,9 @@ const AdminOrders = () => {
   const [search, setSearch]         = useState('');
   const [statusFilter, setStatus]   = useState('All');
   const [methodFilter, setMethod]   = useState('All');
+  const [bizFilter, setBizFilter]   = useState('All');
+  const [dateFrom, setDateFrom]     = useState('');
+  const [dateTo, setDateTo]         = useState('');
   const [page, setPage]             = useState(1);
   const [pageSize, setPageSize]     = useState(10);
   const [selected, setSelected]     = useState([]);
@@ -56,13 +85,20 @@ const AdminOrders = () => {
   const [drawerOrder, setDrawer]    = useState(null);
   const [sortKey, setSortKey]       = useState('id');
   const [sortDir, setSortDir]       = useState('desc');
+  const [businesses, setBusinesses] = useState([]);
+  
   const { toast } = useToast();
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const r = await axios.get(`${API}/orders/?all=true`, authH());
+      const [r, b] = await Promise.all([
+        axios.get(`${API}/orders/?all=true`, authH()),
+        axios.get(`${API}/businesses/`, authH())
+      ]);
       setOrders(r.data);
+      let bizList = b.data.results || b.data;
+      setBusinesses(bizList.filter(bz => bz.type === 'product'));
     } catch { toast('Failed to fetch orders', 'error'); }
     setLoading(false);
   };
@@ -92,6 +128,11 @@ const AdminOrders = () => {
 
   const filtered = useMemo(() => {
     let list = [...orders];
+
+    if (bizFilter !== 'All') {
+      list = list.filter(o => String(o.business) === bizFilter);
+    }
+
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(o =>
@@ -102,6 +143,18 @@ const AdminOrders = () => {
     }
     if (statusFilter !== 'All') list = list.filter(o => o.status === statusFilter);
     if (methodFilter !== 'All') list = list.filter(o => o.payment_method === methodFilter);
+    
+    if (dateFrom) {
+      const fromD = new Date(dateFrom);
+      fromD.setHours(0,0,0,0);
+      list = list.filter(o => new Date(o.created_at) >= fromD);
+    }
+    if (dateTo) {
+      const toD = new Date(dateTo);
+      toD.setHours(23,59,59,999);
+      list = list.filter(o => new Date(o.created_at) <= toD);
+    }
+
     list.sort((a, b) => {
       let av = a[sortKey], bv = b[sortKey];
       if (sortKey === 'total_amount') { av = Number(av); bv = Number(bv); }
@@ -110,7 +163,7 @@ const AdminOrders = () => {
       return 0;
     });
     return list;
-  }, [orders, search, statusFilter, methodFilter, sortKey, sortDir]);
+  }, [orders, search, statusFilter, methodFilter, bizFilter, dateFrom, dateTo, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -135,15 +188,23 @@ const AdminOrders = () => {
             style={{ borderColor: 'var(--admin-border)', color: 'var(--admin-text-muted)' }}>
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
-          <button onClick={() => exportCSV(filtered)} className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors shadow">
-            <Download className="w-4 h-4" /> Export CSV
-          </button>
+          
+          <div className="flex bg-slate-100 rounded-xl p-0.5 border" style={{ borderColor: 'var(--admin-border)' }}>
+            <button onClick={() => exportCSV(filtered)} className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-white text-slate-700 font-semibold shadow-sm hover:text-brand-600 transition-colors">
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+            <button onClick={() => exportExcel(filtered)} className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white font-semibold shadow hover:bg-green-700 transition-colors">
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+            </button>
+          </div>
         </div>
       </div>
 
+
+
       {/* Filters */}
       <div className="admin-card p-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-52">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--admin-text-muted)' }} />
           <input
             value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
@@ -152,16 +213,40 @@ const AdminOrders = () => {
             style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}
           />
         </div>
+        <select value={bizFilter} onChange={e => { setBizFilter(e.target.value); setPage(1); }}
+          className="text-sm px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-brand-500"
+          style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}>
+          <option value="All">All Businesses</option>
+          {businesses.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+        </select>
         <select value={statusFilter} onChange={e => { setStatus(e.target.value); setPage(1); }}
           className="text-sm px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-brand-500"
           style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}>
           {ALL_STATUSES.map(s => <option key={s}>{s}</option>)}
         </select>
-        <select value={methodFilter} onChange={e => { setMethod(e.target.value); setPage(1); }}
-          className="text-sm px-3 py-2 rounded-xl border outline-none focus:ring-2 focus:ring-brand-500"
-          style={{ background: 'var(--admin-content-bg)', borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}>
-          {ALL_METHODS.map(s => <option key={s}>{s}</option>)}
+        <select value={methodFilter} onChange={e => { setMethod(e.target.value); setPage(1); }} className="text-sm px-3 py-2 rounded-lg border bg-white outline-none"
+          style={{ borderColor: 'var(--admin-border)', color: 'var(--admin-text)' }}>
+          {ALL_METHODS.map(m => <option key={m} value={m}>{m === 'All' ? 'All Methods' : m}</option>)}
         </select>
+        
+        <div className="flex items-center gap-2 border rounded-lg px-2 bg-white" style={{ borderColor: 'var(--admin-border)' }}>
+          <Calendar className="w-4 h-4 text-slate-400" />
+          <input 
+            type="date" 
+            value={dateFrom} 
+            onChange={e => setDateFrom(e.target.value)} 
+            className="text-xs px-1 py-2 outline-none text-slate-600 bg-transparent"
+            title="Start Date"
+          />
+          <span className="text-slate-300">-</span>
+          <input 
+            type="date" 
+            value={dateTo} 
+            onChange={e => setDateTo(e.target.value)} 
+            className="text-xs px-1 py-2 outline-none text-slate-600 bg-transparent"
+            title="End Date"
+          />
+        </div>
       </div>
 
       {/* Bulk actions */}
@@ -198,7 +283,7 @@ const AdminOrders = () => {
                     className="w-4 h-4 rounded"
                   />
                 </th>
-                {[['id','Order #'],['user_name','Customer'],['total_amount','Amount'],['payment_method','Method'],['status','Status'],['created_at','Date']].map(([k, label]) => (
+                {[['id','Order #'],['user_name','Customer'],['business','Business'],['category','Category'],['total_amount','Amount'],['payment_method','Method'],['status','Status'],['created_at','Date']].map(([k, label]) => (
                   <th key={k} className="px-4 py-3 text-left cursor-pointer select-none font-semibold text-xs uppercase tracking-wider"
                     style={{ color: 'var(--admin-text-muted)' }}
                     onClick={() => sort(k)}>
@@ -209,7 +294,9 @@ const AdminOrders = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.map((o, i) => (
+              {paginated.map((o, i) => {
+                const category = o.items && o.items.length > 0 ? o.items[0].product_category_name || 'N/A' : 'N/A';
+                return (
                 <motion.tr
                   key={o.id}
                   initial={{ opacity: 0 }}
@@ -227,6 +314,12 @@ const AdminOrders = () => {
                   <td className="px-4 py-3.5">
                     <p className="font-semibold text-sm" style={{ color: 'var(--admin-text)' }}>{o.user_name || o.full_name}</p>
                     <p className="text-xs" style={{ color: 'var(--admin-text-muted)' }}>{o.user_email}</p>
+                  </td>
+                  <td className="px-4 py-3.5 text-sm font-medium" style={{ color: 'var(--admin-text)' }}>
+                    {o.business_name || 'N/A'}
+                  </td>
+                  <td className="px-4 py-3.5 text-sm font-medium" style={{ color: 'var(--admin-text)' }}>
+                    {category}
                   </td>
                   <td className="px-4 py-3.5 font-semibold" style={{ color: 'var(--admin-text)' }}>₹{Number(o.total_amount).toLocaleString('en-IN')}</td>
                   <td className="px-4 py-3.5">
@@ -259,7 +352,7 @@ const AdminOrders = () => {
                     </div>
                   </td>
                 </motion.tr>
-              ))}
+              )})}
               {paginated.length === 0 && (
                 <tr>
                   <td colSpan={8} className="py-16 text-center" style={{ color: 'var(--admin-text-muted)' }}>

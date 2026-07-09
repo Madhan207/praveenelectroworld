@@ -5,7 +5,7 @@ import { UserPlus, Eye, EyeOff, Shield, Settings, Bell, Store, Lock, CheckCircle
 import { useToast } from '../../context/ToastContext';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
-const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+const authH = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token')}` } });
 
 const EMPTY = { name: '', email: '', mobile_number: '', password: '', confirm_password: '' };
 

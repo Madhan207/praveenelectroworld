@@ -1,51 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import axios from 'axios';
 import { ProductCard } from '../components/ProductCard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { SlidersHorizontal, X, Loader2 } from 'lucide-react';
 
-// ─── All fake products ───────────────────────────────────────────────────────
-export const ALL_PRODUCTS = {
-  smartphones: [
-    { id: 101, name: 'Samsung Galaxy S25 Ultra', category_name: 'Smartphones', slug: 'samsung-galaxy-s25-ultra', price: '129999', discount_price: '119999', rating: '4.8', stock: 25, brand: 'Samsung', images: [{ image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600&q=80' }] },
-    { id: 102, name: 'iPhone 16 Pro Max', category_name: 'Smartphones', slug: 'iphone-16-pro-max', price: '159900', discount_price: null, rating: '4.9', stock: 18, brand: 'Apple', images: [{ image: 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=600&q=80' }] },
-    { id: 103, name: 'OnePlus 13', category_name: 'Smartphones', slug: 'oneplus-13', price: '69999', discount_price: '64999', rating: '4.6', stock: 40, brand: 'OnePlus', images: [{ image: 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=600&q=80' }] },
-    { id: 104, name: 'Google Pixel 9 Pro', category_name: 'Smartphones', slug: 'google-pixel-9-pro', price: '109999', discount_price: '99999', rating: '4.7', stock: 15, brand: 'Google', images: [{ image: 'https://images.unsplash.com/photo-1565849904461-04a58ad377e0?w=600&q=80' }] },
-    { id: 105, name: 'Realme GT 6T 5G', category_name: 'Smartphones', slug: 'realme-gt-6t-5g', price: '35999', discount_price: '32999', rating: '4.4', stock: 60, brand: 'Realme', images: [{ image: 'https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=600&q=80' }] },
-    { id: 106, name: 'Xiaomi 14 Ultra', category_name: 'Smartphones', slug: 'xiaomi-14-ultra', price: '99999', discount_price: '94999', rating: '4.7', stock: 20, brand: 'Xiaomi', images: [{ image: 'https://images.unsplash.com/photo-1628815113969-0487917e8b76?w=600&q=80' }] },
-  ],
-  audio: [
-    { id: 201, name: 'Sony WH-1000XM5 Headphones', category_name: 'Audio Systems', slug: 'sony-wh-1000xm5', price: '29990', discount_price: '26490', rating: '4.9', stock: 80, brand: 'Sony', images: [{ image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&q=80' }] },
-    { id: 202, name: 'Apple AirPods Pro 2nd Gen', category_name: 'Audio Systems', slug: 'apple-airpods-pro-2', price: '24900', discount_price: '22900', rating: '4.8', stock: 50, brand: 'Apple', images: [{ image: 'https://images.unsplash.com/photo-1588423771073-b8903febb85b?w=600&q=80' }] },
-    { id: 203, name: 'Bose QuietComfort 45', category_name: 'Audio Systems', slug: 'bose-qc45', price: '24500', discount_price: '21990', rating: '4.7', stock: 30, brand: 'Bose', images: [{ image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=600&q=80' }] },
-    { id: 204, name: 'JBL Charge 5 Speaker', category_name: 'Audio Systems', slug: 'jbl-charge-5', price: '16999', discount_price: '14999', rating: '4.5', stock: 100, brand: 'JBL', images: [{ image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=600&q=80' }] },
-    { id: 205, name: 'Sennheiser HD 560S', category_name: 'Audio Systems', slug: 'sennheiser-hd-560s', price: '14990', discount_price: null, rating: '4.6', stock: 25, brand: 'Sennheiser', images: [{ image: 'https://images.unsplash.com/photo-1524678714210-9917a6c619c2?w=600&q=80' }] },
-    { id: 206, name: 'Boat Airdopes 141 TWS', category_name: 'Audio Systems', slug: 'boat-airdopes-141', price: '1299', discount_price: '899', rating: '4.2', stock: 500, brand: 'boAt', images: [{ image: 'https://images.unsplash.com/photo-1570394524600-c7b4c274cb84?w=600&q=80' }] },
-  ],
-  'home-appliances': [
-    { id: 301, name: 'LG 1.5 Ton 5 Star AI Inverter AC', category_name: 'Home Appliances', slug: 'lg-15-ton-5star-ac', price: '45990', discount_price: '42990', rating: '4.7', stock: 30, brand: 'LG', images: [{ image: 'https://images.unsplash.com/photo-1562766024-11cb4e4e78e5?w=600&q=80' }] },
-    { id: 302, name: 'Samsung 324L Frost Free Refrigerator', category_name: 'Home Appliances', slug: 'samsung-324l-fridge', price: '34990', discount_price: '29990', rating: '4.5', stock: 15, brand: 'Samsung', images: [{ image: 'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=600&q=80' }] },
-    { id: 303, name: 'IFB 7kg Front Load Washing Machine', category_name: 'Home Appliances', slug: 'ifb-7kg-washing-machine', price: '32990', discount_price: '28990', rating: '4.6', stock: 20, brand: 'IFB', images: [{ image: 'https://images.unsplash.com/photo-1626806787461-102c1a9a8c34?w=600&q=80' }] },
-    { id: 304, name: 'Philips Air Fryer XXL 7.3L', category_name: 'Home Appliances', slug: 'philips-air-fryer-xxl', price: '13995', discount_price: '10995', rating: '4.4', stock: 45, brand: 'Philips', images: [{ image: 'https://images.unsplash.com/photo-1585659722983-3a675dabf23d?w=600&q=80' }] },
-    { id: 305, name: 'Dyson V15 Detect Cordless Vacuum', category_name: 'Home Appliances', slug: 'dyson-v15-detect', price: '62900', discount_price: '55900', rating: '4.8', stock: 10, brand: 'Dyson', images: [{ image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' }] },
-    { id: 306, name: 'Whirlpool 25L Convection Microwave', category_name: 'Home Appliances', slug: 'whirlpool-25l-microwave', price: '10990', discount_price: '8990', rating: '4.3', stock: 35, brand: 'Whirlpool', images: [{ image: 'https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?w=600&q=80' }] },
-  ],
-  electrical: [
-    { id: 401, name: 'Havells 6-Module Modular Switch Board', category_name: 'Electrical', slug: 'havells-6-module-switch', price: '1299', discount_price: '999', rating: '4.5', stock: 500, brand: 'Havells', images: [{ image: 'https://images.unsplash.com/photo-1621905251189-08b45249e1b7?w=600&q=80' }] },
-    { id: 402, name: 'Philips 10W LED Bulb Pack of 4', category_name: 'Electrical', slug: 'philips-10w-led-bulbs-4', price: '599', discount_price: '449', rating: '4.6', stock: 1000, brand: 'Philips', images: [{ image: 'https://images.unsplash.com/photo-1545259742-f9e34d4e48b8?w=600&q=80' }] },
-    { id: 403, name: 'Syska 5A Extension Board 3m', category_name: 'Electrical', slug: 'syska-extension-board-3m', price: '799', discount_price: '599', rating: '4.4', stock: 300, brand: 'Syska', images: [{ image: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=600&q=80' }] },
-    { id: 404, name: 'Anchor Roma Smart WiFi Switch', category_name: 'Electrical', slug: 'anchor-roma-wifi-switch', price: '3499', discount_price: '2999', rating: '4.3', stock: 150, brand: 'Anchor', images: [{ image: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=600&q=80' }] },
-    { id: 405, name: 'Legrand 16A 3-Pin Power Socket', category_name: 'Electrical', slug: 'legrand-16a-socket', price: '450', discount_price: null, rating: '4.5', stock: 800, brand: 'Legrand', images: [{ image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80' }] },
-    { id: 406, name: 'Crompton 48W LED Tube Light', category_name: 'Electrical', slug: 'crompton-48w-led-tube', price: '699', discount_price: '549', rating: '4.4', stock: 600, brand: 'Crompton', images: [{ image: 'https://images.unsplash.com/photo-1524898615959-4e3a73bf2c3d?w=600&q=80' }] },
-  ],
-};
-
-const CATEGORY_META = {
-  smartphones: { label: 'Smartphones', hero: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=1400&q=80', desc: 'Latest flagship and mid-range smartphones from top brands' },
-  audio: { label: 'Audio Systems', hero: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1400&q=80', desc: 'Premium headphones, earbuds, and speakers for every budget' },
-  'home-appliances': { label: 'Home Appliances', hero: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1400&q=80', desc: 'Smart and energy-efficient appliances to power your home' },
-  electrical: { label: 'Electrical', hero: 'https://images.unsplash.com/photo-1621905251189-08b45249e1b7?w=1400&q=80', desc: 'Switches, bulbs, and wiring accessories from top brands' },
-};
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
 
 const PRICE_RANGES = [
   { label: 'All Prices', min: 0, max: Infinity },
@@ -65,15 +25,35 @@ const SORT_OPTIONS = [
 
 export const CategoryPage = () => {
   const { slug } = useParams();
+  const [products, setProducts] = useState([]);
+  const [category, setCategory] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
   const [sortBy, setSortBy] = useState('relevance');
   const [priceRange, setPriceRange] = useState(0);
   const [selectedBrands, setSelectedBrands] = useState([]);
   const [onlyOnSale, setOnlyOnSale] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
 
-  const products = ALL_PRODUCTS[slug] || [];
-  const meta = CATEGORY_META[slug] || { label: slug, hero: '', desc: '' };
-  const brands = [...new Set(products.map(p => p.brand))];
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [catRes, prodRes] = await Promise.all([
+          axios.get(`${API}/categories/${slug}/`),
+          axios.get(`${API}/products/?category=${slug}`)
+        ]);
+        setCategory(catRes.data);
+        setProducts(prodRes.data.results || prodRes.data);
+      } catch (error) {
+        console.error("Failed to load category data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [slug]);
+
+  const brands = [...new Set(products.map(p => p.brand).filter(Boolean))];
   const range = PRICE_RANGES[priceRange];
 
   const toggleBrand = (brand) =>
@@ -99,23 +79,41 @@ export const CategoryPage = () => {
 
   const hasActiveFilters = priceRange !== 0 || selectedBrands.length > 0 || onlyOnSale || sortBy !== 'relevance';
 
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-brand-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!category) {
+    return <div className="text-center py-20 text-2xl font-bold text-slate-700">Category not found.</div>;
+  }
+
   return (
     <div>
       {/* Hero Banner */}
-      <div className="relative rounded-3xl overflow-hidden h-52 mb-10 bg-slate-900 flex items-center px-10">
-        {meta.hero && <img src={meta.hero} alt={meta.label} className="absolute inset-0 w-full h-full object-cover opacity-20" />}
+      <div className="relative rounded-3xl overflow-hidden h-52 mb-10 bg-slate-900 flex items-center px-10 mt-16">
+        {category.image && <img src={category.image} alt={category.name} className="absolute inset-0 w-full h-full object-cover opacity-20" />}
         <div className="relative z-10 text-white">
           <nav className="text-xs text-slate-400 mb-2 flex gap-1 items-center">
             <Link to="/" className="hover:text-white">Home</Link>
             <span>/</span>
-            <span className="text-white">{meta.label}</span>
+            {category.business && (
+              <>
+                <Link to={`/company/${category.business.slug}`} className="hover:text-white">{category.business.name}</Link>
+                <span>/</span>
+              </>
+            )}
+            <span className="text-white">{category.name}</span>
           </nav>
-          <h1 className="text-4xl font-heading font-bold mb-1">{meta.label}</h1>
-          <p className="text-slate-300">{meta.desc} · <strong>{products.length} products</strong></p>
+          <h1 className="text-4xl font-heading font-bold mb-1">{category.name}</h1>
+          <p className="text-slate-300"><strong>{products.length} products available</strong></p>
         </div>
       </div>
 
-      <div className="flex gap-8">
+      <div className="flex gap-8 px-6 pb-20 max-w-7xl mx-auto">
         {/* ── Sidebar Filter Panel ── */}
         <aside className="hidden lg:block w-60 shrink-0">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 sticky top-24 space-y-7">
@@ -155,17 +153,19 @@ export const CategoryPage = () => {
             </div>
 
             {/* Brand */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Brand</h4>
-              <div className="space-y-1">
-                {brands.map(brand => (
-                  <label key={brand} className="flex items-center gap-2 cursor-pointer group">
-                    <input type="checkbox" checked={selectedBrands.includes(brand)} onChange={() => toggleBrand(brand)} className="rounded text-brand-600" />
-                    <span className={`text-sm ${selectedBrands.includes(brand) ? 'text-brand-600 font-semibold' : 'text-slate-600 group-hover:text-slate-900'}`}>{brand}</span>
-                  </label>
-                ))}
+            {brands.length > 0 && (
+              <div>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Brand</h4>
+                <div className="space-y-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                  {brands.map(brand => (
+                    <label key={brand} className="flex items-center gap-2 cursor-pointer group">
+                      <input type="checkbox" checked={selectedBrands.includes(brand)} onChange={() => toggleBrand(brand)} className="rounded text-brand-600" />
+                      <span className={`text-sm ${selectedBrands.includes(brand) ? 'text-brand-600 font-semibold' : 'text-slate-600 group-hover:text-slate-900'} line-clamp-1`}>{brand}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* On Sale toggle */}
             <div className="flex items-center justify-between">
@@ -182,7 +182,6 @@ export const CategoryPage = () => {
 
         {/* ── Product Grid ── */}
         <div className="flex-1 min-w-0">
-          {/* Product Grid */}
           {filtered.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               <AnimatePresence mode="popLayout">
@@ -213,3 +212,4 @@ export const CategoryPage = () => {
     </div>
   );
 };
+

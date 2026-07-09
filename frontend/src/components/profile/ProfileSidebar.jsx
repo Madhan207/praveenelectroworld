@@ -1,14 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  LayoutDashboard, Package, Heart, MapPin, CreditCard, 
-  Tag, Bell, Star, Settings, ShieldCheck, LogOut 
+  LayoutDashboard, Package, MapPin, CreditCard, 
+  Tag, Bell, Star, Settings, ShieldCheck, LogOut, Calendar
 } from 'lucide-react';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'orders', label: 'My Orders', icon: Package },
-  { id: 'wishlist', label: 'Wishlist', icon: Heart },
+  { id: 'bookings', label: 'My Bookings', icon: Calendar },
   { id: 'addresses', label: 'Saved Addresses', icon: MapPin },
   { id: 'payments', label: 'Payment Methods', icon: CreditCard },
   { id: 'coupons', label: 'Coupons & Rewards', icon: Tag },

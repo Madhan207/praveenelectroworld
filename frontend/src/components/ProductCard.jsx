@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Zap, Star } from 'lucide-react';
+import { ShoppingCart, Zap, Star, CalendarDays } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -49,8 +49,13 @@ export const ProductCard = memo(({ product }) => {
               -{discount}%
             </span>
           )}
+          {product.is_service && (
+            <span className="bg-blue-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow">
+              Service
+            </span>
+          )}
         </div>
-        {product.stock < 10 && product.stock > 0 && (
+        {!product.is_service && product.stock < 10 && product.stock > 0 && (
           <div className="absolute bottom-3 left-3 bg-orange-500/90 text-white text-xs font-semibold px-2 py-1 rounded-lg">
             Only {product.stock} left!
           </div>
@@ -91,18 +96,29 @@ export const ProductCard = memo(({ product }) => {
 
         {/* Buttons */}
         <div className="flex gap-2">
-          <button
-            onClick={handleAddToCart}
-            className="flex-1 flex items-center justify-center gap-1.5 border-2 border-brand-500 text-brand-600 font-bold py-2.5 rounded-xl hover:bg-brand-50 transition-all text-sm"
-          >
-            <ShoppingCart className="w-4 h-4" /> Cart
-          </button>
-          <button
-            onClick={handleBuyNow}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-brand-600 text-white font-bold py-2.5 rounded-xl hover:bg-brand-700 transition-all text-sm shadow-md hover:shadow-lg"
-          >
-            <Zap className="w-4 h-4" /> Buy Now
-          </button>
+          {product.is_service ? (
+            <button
+              onClick={handleBuyNow}
+              className="w-full flex items-center justify-center gap-1.5 bg-brand-600 text-white font-bold py-2.5 rounded-xl hover:bg-brand-700 transition-all text-sm shadow-md hover:shadow-lg"
+            >
+              <CalendarDays className="w-4 h-4" /> Book Service
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleAddToCart}
+                className="flex-1 flex items-center justify-center gap-1.5 border-2 border-brand-500 text-brand-600 font-bold py-2.5 rounded-xl hover:bg-brand-50 transition-all text-sm"
+              >
+                <ShoppingCart className="w-4 h-4" /> Cart
+              </button>
+              <button
+                onClick={handleBuyNow}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-brand-600 text-white font-bold py-2.5 rounded-xl hover:bg-brand-700 transition-all text-sm shadow-md hover:shadow-lg"
+              >
+                <Zap className="w-4 h-4" /> Buy Now
+              </button>
+            </>
+          )}
         </div>
       </div>
     </motion.div>

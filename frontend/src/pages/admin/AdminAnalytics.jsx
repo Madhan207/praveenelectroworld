@@ -6,7 +6,7 @@ import { SalesLineChart, RevenueLineChart, StatusDonutChart, ProductBarChart } f
 import { SkeletonCard } from '../../components/admin/SkeletonLoader';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
-const authH = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+const authH = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token')}` } });
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -85,8 +85,8 @@ const AdminAnalytics = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-bold" style={{ color: 'var(--admin-text)' }}>Analytics & Reports</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--admin-text-muted)' }}>Performance insights computed from your order data</p>
+        <h1 className="text-2xl font-heading font-bold" style={{ color: 'var(--admin-text)' }}>Product Analytics</h1>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--admin-text-muted)' }}>Performance insights computed from your product orders</p>
       </div>
 
       {/* KPI summary */}

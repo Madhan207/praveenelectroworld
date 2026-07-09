@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/Button';
@@ -7,7 +7,7 @@ import axios from 'axios';
 import { CheckCircle, Package, MapPin, CreditCard } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
-const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token')}` } });
 
 export const Checkout = () => {
   const { cartItems, getCartTotal, clearCart } = useCart();
@@ -19,6 +19,27 @@ export const Checkout = () => {
   const [error, setError] = useState('');
   const [utrNumber, setUtrNumber] = useState('');
   const [screenshot, setScreenshot] = useState(null);
+  const [paymentSettings, setPaymentSettings] = useState(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await axios.get(`${API}/payment-settings/`);
+        const settings = res.data.results || res.data;
+        if (settings.length > 0) {
+          setPaymentSettings(settings[0]);
+          
+          // If COD is default but disabled, switch to UPI
+          if (!settings[0].cod_enabled && settings[0].upi_enabled) {
+            setFormData(prev => ({ ...prev, payment_method: 'UPI' }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load payment settings", err);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const [formData, setFormData] = useState({
     full_name: user?.name || '',
@@ -27,7 +48,7 @@ export const Checkout = () => {
     city: '',
     state: 'Tamil Nadu',
     pincode: '',
-    payment_method: 'COD',
+    payment_method: 'UPI',
   });
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -62,7 +83,7 @@ export const Checkout = () => {
         pincode: formData.pincode,
         payment_method: formData.payment_method,
         total_amount: total,
-        items: cartItems.map(item => ({
+        order_items: cartItems.map(item => ({
           product: item.id,
           quantity: item.quantity,
           price: item.discount_price || item.price,
@@ -80,7 +101,7 @@ export const Checkout = () => {
         fd.append('screenshot', screenshot);
         await axios.post(`${API}/payment-verifications/`, fd, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+            Authorization: `Bearer ${sessionStorage.getItem('access_token')}`,
             'Content-Type': 'multipart/form-data',
           },
         });
@@ -179,8 +200,10 @@ export const Checkout = () => {
           {error && <div className="bg-red-50 text-red-600 border border-red-200 rounded-xl p-3 mb-5 text-sm">{error}</div>}
           <form onSubmit={submitOrder} className="space-y-6">
             {/* Method Selector */}
-            <div className="grid grid-cols-2 gap-4">
-              {[{ value: 'UPI', label: '📱 UPI Payment', sub: 'Scan QR & upload proof' }, { value: 'COD', label: '💵 Cash on Delivery', sub: 'Pay when you receive' }].map(m => (
+            <div className="grid grid-cols-1 gap-4">
+              {[
+                { value: 'UPI', label: '📱 UPI Payment', sub: 'Scan QR & upload proof', enabled: paymentSettings ? paymentSettings.upi_enabled : true },
+              ].filter(m => m.enabled).map(m => (
                 <label key={m.value} className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${formData.payment_method === m.value ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-brand-300'}`}>
                   <input type="radio" name="payment_method" value={m.value} checked={formData.payment_method === m.value} onChange={handleChange} className="hidden" />
                   <div className="font-bold text-slate-900">{m.label}</div>
@@ -194,8 +217,24 @@ export const Checkout = () => {
               <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
                 <div className="text-center mb-4">
                   <h3 className="font-bold text-xl mb-1">Pay ₹{total.toLocaleString('en-IN')}</h3>
-                  <p className="text-brand-600 font-semibold text-lg">praveenelectro@upi</p>
-                  <img src="https://placehold.co/200x200/1d4ed8/ffffff?text=UPI+QR" alt="UPI QR" className="mx-auto mt-3 w-40 h-40 rounded-xl shadow-md" />
+                  <p className="text-slate-500 text-sm mb-3">Scan the QR below with any UPI app</p>
+                  <div className="inline-block bg-white rounded-2xl shadow-lg p-3 border border-slate-200">
+                    <img
+                      src="/upi-qr.jpg"
+                      alt="UPI QR Code - Praveen Electro World"
+                      className="mx-auto w-56 h-auto rounded-xl"
+                    />
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <p className="text-brand-600 font-bold text-base">8675398848@okbizaxis</p>
+                    <p className="text-slate-500 text-xs">Praveen Electro World · +91 86753 98848</p>
+                    <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">G Pay</span>
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">PhonePe</span>
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">Paytm</span>
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">BHIM UPI</span>
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">UTR / Transaction ID *</label>
@@ -232,11 +271,6 @@ export const Checkout = () => {
           {formData.payment_method === 'UPI' && (
             <p className="text-amber-600 text-sm font-medium bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
               ⏳ Your UPI payment is pending verification. Our admin will confirm it shortly.
-            </p>
-          )}
-          {formData.payment_method === 'COD' && (
-            <p className="text-green-600 text-sm font-medium bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-6">
-              ✅ Your COD order is confirmed! Pay when delivered.
             </p>
           )}
           <div className="flex gap-4 justify-center">

@@ -4,18 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Package, ShoppingBag, Users, BarChart3,
   Settings, LogOut, Zap, ChevronLeft, ChevronRight,
-  TrendingUp, Shield
+  Shield, Image as ImageIcon, Briefcase, HeartHandshake, Truck, Receipt, FileText, Lock, Calendar
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-
-const NAV = [
-  { to: '/admin',          label: 'Dashboard',  icon: LayoutDashboard, end: true },
-  { to: '/admin/orders',   label: 'Orders',     icon: ShoppingBag },
-  { to: '/admin/products', label: 'Products',   icon: Package },
-  { to: '/admin/customers',label: 'Customers',  icon: Users },
-  { to: '/admin/analytics',label: 'Analytics',  icon: BarChart3 },
-  { to: '/admin/settings', label: 'Settings',   icon: Settings },
-];
 
 const AdminSidebar = ({ collapsed, onToggle }) => {
   const { user, logout } = useAuth();
@@ -26,15 +17,61 @@ const AdminSidebar = ({ collapsed, onToggle }) => {
     navigate('/');
   };
 
+  // Three core enterprise modules
+  const sections = [
+    {
+      title: 'Overview',
+      items: [
+        { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+        { to: '/admin/settings', label: 'Settings', icon: Settings },
+      ]
+    },
+    {
+      title: 'Product Management',
+      items: [
+        { to: '/admin/businesses?type=product', label: 'Businesses', icon: Briefcase },
+        { to: '/admin/products', label: 'Products', icon: Package },
+        { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
+        { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+      ]
+    },
+    {
+      title: 'Service Management',
+      items: [
+        { to: '/admin/businesses?type=service', label: 'Businesses', icon: Briefcase },
+        { to: '/admin/service-management', label: 'Services & Packages', icon: Briefcase },
+        { to: '/admin/bookings', label: 'Bookings', icon: Calendar },
+      ]
+    },
+    {
+      title: 'Trust Management',
+      items: [
+        { to: '/admin/businesses?type=trust', label: 'Businesses', icon: Briefcase },
+        { to: '/admin/trust-management', label: 'Programs & Events', icon: HeartHandshake },
+      ]
+    },
+    {
+      title: 'System',
+      items: [
+        { to: '/admin/customers', label: 'All Customers', icon: Users },
+        { to: '/admin/payments', label: 'Payments', icon: Receipt },
+        { to: '/admin/purchase', label: 'Purchase', icon: ShoppingBag },
+        { to: '/admin/banners', label: 'Banners', icon: ImageIcon },
+        { to: '/admin/reports', label: 'Reports', icon: FileText },
+        { to: '/admin/security', label: 'Security Logs', icon: Lock },
+      ]
+    }
+  ];
+
   return (
     <motion.aside
       animate={{ width: collapsed ? 72 : 240 }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className="admin-sidebar relative z-20 flex flex-col shrink-0 h-full"
+      className="admin-sidebar relative z-20 flex flex-col shrink-0 h-full overflow-y-auto custom-scrollbar"
       style={{ background: 'var(--admin-sidebar-bg)' }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/8">
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/8 shrink-0 sticky top-0 z-10" style={{ background: 'var(--admin-sidebar-bg)' }}>
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shrink-0 shadow-lg shadow-brand-900/50">
           <Zap className="w-5 h-5 text-white" />
         </div>
@@ -63,7 +100,7 @@ const AdminSidebar = ({ collapsed, onToggle }) => {
       </button>
 
       {/* Admin profile */}
-      <div className={`flex items-center gap-3 mx-3 my-4 p-3 rounded-xl bg-white/5 border border-white/8 ${collapsed ? 'justify-center' : ''}`}>
+      <div className={`flex items-center gap-3 mx-3 my-4 p-3 rounded-xl bg-white/5 border border-white/8 shrink-0 ${collapsed ? 'justify-center' : ''}`}>
         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
           {user?.name?.[0]?.toUpperCase() || 'A'}
         </div>
@@ -78,7 +115,7 @@ const AdminSidebar = ({ collapsed, onToggle }) => {
               <p className="text-white text-sm font-semibold truncate">{user?.name}</p>
               <div className="flex items-center gap-1">
                 <Shield className="w-3 h-3 text-brand-400" />
-                <span className="text-brand-400 text-xs">Administrator</span>
+                <span className="text-brand-400 text-xs">Super Admin</span>
               </div>
             </motion.div>
           )}
@@ -86,40 +123,58 @@ const AdminSidebar = ({ collapsed, onToggle }) => {
       </div>
 
       {/* Navigation */}
-      {!collapsed && (
-        <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest px-5 mb-2">Navigation</p>
-      )}
-      <nav className="flex-1 px-3 space-y-1">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `admin-nav-item flex items-center gap-3 px-3 py-2.5 w-full transition-all ${isActive ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`
-            }
-            title={collapsed ? label : ''}
-          >
-            <Icon className="w-4.5 h-4.5 shrink-0" style={{ width: '18px', height: '18px' }} />
-            <AnimatePresence>
-              {!collapsed && (
-                <motion.span
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.15 }}
-                  className="text-sm font-medium"
-                >
-                  {label}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </NavLink>
+      <nav className="flex-1 px-3 pb-6">
+        {sections.map((section, idx) => (
+          <div key={idx} className="mb-6">
+            {!collapsed && (
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest px-2 mb-2">
+                {section.title}
+              </p>
+            )}
+            <div className="space-y-1">
+              {section.items.map(({ to, label, icon: Icon, end }) => {
+                // Determine isActive for query param routes
+                const isActiveClass = ({ isActive, search }) => {
+                  let isMatch = isActive;
+                  if (to.includes('?')) {
+                    const [path, query] = to.split('?');
+                    isMatch = window.location.pathname === path && window.location.search === `?${query}`;
+                  }
+                  return `admin-nav-item flex items-center gap-3 px-3 py-2 w-full transition-all ${isMatch ? 'active' : ''} ${collapsed ? 'justify-center' : ''}`;
+                };
+
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    className={isActiveClass}
+                    title={collapsed ? label : ''}
+                  >
+                    <Icon className="w-4 h-4 shrink-0" style={{ width: '18px', height: '18px' }} />
+                    <AnimatePresence>
+                      {!collapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -8 }}
+                          transition={{ duration: 0.15 }}
+                          className="text-sm font-medium whitespace-nowrap"
+                        >
+                          {label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </nav>
 
       {/* Footer */}
-      <div className="px-3 pb-5 border-t border-white/8 pt-4">
+      <div className="px-3 pb-5 pt-4 shrink-0 sticky bottom-0 z-10" style={{ background: 'var(--admin-sidebar-bg)' }}>
         <button
           onClick={handleLogout}
           className={`admin-nav-item flex items-center gap-3 px-3 py-2.5 w-full text-red-400 hover:bg-red-500/15 hover:text-red-300 ${collapsed ? 'justify-center' : ''}`}

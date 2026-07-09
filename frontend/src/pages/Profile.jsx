@@ -7,13 +7,14 @@ import { ProfileSidebar } from '../components/profile/ProfileSidebar';
 import { DashboardOverview } from '../components/profile/DashboardOverview';
 import { OrdersTab } from '../components/profile/OrdersTab';
 import { 
-  WishlistTab, AddressesTab, PaymentsTab, CouponsTab, 
+  AddressesTab, PaymentsTab, CouponsTab, 
   NotificationsTab, ReviewsTab, SettingsTab, SecurityTab 
 } from '../components/profile/MockedTabs';
+import { BookingsTab } from '../components/profile/BookingsTab';
 import { Menu, X } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000/api' : '/api');
-const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } });
+const authHeaders = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('access_token')}` } });
 
 export const Profile = () => {
   const { user, logout } = useAuth();
@@ -52,7 +53,8 @@ export const Profile = () => {
     switch (activeTab) {
       case 'dashboard': return <DashboardOverview user={user} orders={orders} />;
       case 'orders': return <OrdersTab orders={orders} />;
-      case 'wishlist': return <WishlistTab />;
+      case 'bookings': return <BookingsTab />;
+
       case 'addresses': return <AddressesTab />;
       case 'payments': return <PaymentsTab />;
       case 'coupons': return <CouponsTab />;

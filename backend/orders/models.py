@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from products.models import Product
+from products.models import Product, Business
 
 class Order(models.Model):
     STATUS_CHOICES = (
@@ -17,6 +17,7 @@ class Order(models.Model):
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders')
+    business = models.ForeignKey(Business, on_delete=models.SET_NULL, null=True, related_name='orders')
     
     # Shipping Info
     full_name = models.CharField(max_length=200)
@@ -54,3 +55,28 @@ class PaymentVerification(models.Model):
 
     def __str__(self):
         return f"Payment for Order {self.order.id}"
+
+class Cart(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cart')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Cart for {self.user.email}"
+
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.quantity} of {self.product.name} in Cart"
+
+class Invoice(models.Model):
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='invoice')
+    invoice_number = models.CharField(max_length=100, unique=True)
+    issued_date = models.DateTimeField(auto_now_add=True)
+    file_url = models.URLField(max_length=500, blank=True, null=True)
+
+    def __str__(self):
+        return f"Invoice {self.invoice_number} for Order {self.order.id}"

@@ -22,8 +22,12 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('users.urls')),
+    path('api/users/', getattr(__import__('users.views', fromlist=['UserListView']), 'UserListView').as_view()),
     path('api/', include('products.urls')),
     path('api/', include('orders.urls')),
+    path('api/', include('core.urls')),
+    path('api/', include('services.urls')),
+    path('api/', include('inventory.urls')),
 ]
 
 if settings.DEBUG:
